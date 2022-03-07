@@ -1,0 +1,277 @@
+groups:
+- name: targets
+  rules:
+  - alert: monitor_service_down
+    expr: up == 0
+    for: 30m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Monitor service non-operational"
+      description: "Service {{ $labels.instance }} is down."
+
+- name: host
+  rules:
+  - alert: high_cpu_load
+    expr: node_load1 > 8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Server under high load"
+      description: "Docker host is under high load, the avg load 1m is at {{ $value}}. Reported by instance {{ $labels.instance }} of job {{ $labels.job }}."
+
+  - alert: high_memory_load
+    expr: (sum(node_memory_MemTotal_bytes) by (instance) - sum(node_memory_MemFree_bytes + node_memory_Buffers_bytes + node_memory_Cached_bytes) by (instance) ) / sum(node_memory_MemTotal_bytes) by (instance) * 100 > 85
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Server memory is almost full"
+      description: "Docker host memory usage is {{ humanize $value}}%. Reported by instance {{ $labels.instance }} of job {{ $labels.job }}."
+
+  - alert: high_storage_load_predictive
+    expr: predict_linear(node_filesystem_size_bytes{fstype="ext4",mountpoint!="/boot"}[4h], 24 * 3600) < 0
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Server storage will be full within 24h"
+      description: "Docker host storage free will be {{ $value }} bytes with next 24h. Reported by instance {{ $labels.instance }} of job {{ $labels.job }}."
+
+  - alert: high_storage_load
+    expr: (node_filesystem_size_bytes{fstype="ext4"} - node_filesystem_free_bytes{fstype="ext4"}) / node_filesystem_size_bytes{fstype="ext4"}  * 100 > 85
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Server storage is almost full"
+      description: "Docker host storage usage is {{ humanize $value}}%. Reported by instance {{ $labels.instance }} of job {{ $labels.job }}."
+
+  - alert: security_update_available
+    expr: security_updates_count > 0
+    for: 2d
+    labels:
+      severity: warning
+    annotations:
+      summary: "Securityupdates are available"
+      description: "There are {{ $value}} Security Updates available"
+
+  - alert: reboot_required
+    expr: reboot_required > 0
+    for: 2d
+    labels:
+      severity: warning
+    annotations:
+      summary: "Reboot Required"
+      description: "Reboot Required"
+
+- name: ssl
+  rules:
+    - alert: SSLCertExpiringSoon
+      expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 30
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "SSL Cert expires soon"
+        description: "Domain {{ $labels.instance }} SSL Certificate expires soon"
+
+    - alert: ssllabs_grade
+      expr: ssllabs_grade{grade="A+"} == 0
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "SSL encryption is weak"
+        description: "SSL encryption for {{ $labels.instance }} is weak, Grade: {{ $labels.grade }}"
+
+- name: disks
+  rules:
+    - alert: raid_status
+      expr: max(node_md_state{state!="active"}) != 0
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "RAID failing"
+        description: "a raid is failing"
+
+    - alert: raid_disk_status
+      expr: node_md_disks{state="failed"} > 0
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "RAID Disk failing"
+        description: "a raid disk is failing"
+
+    - alert: smart_status
+      expr: max(smartmon_device_smart_healthy{}) by (disk) < 1
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Disk SMART Status failing"
+        description: "Disk SMART Status failing"
+
+    - alert: data_disk_mounted
+      expr: absent(node_filesystem_device_error{mountpoint="/media/data"}) == 1
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Nextcloud Data Disk is not mounted!"
+        description: "Nextcloud Data Disk is not mounted!"
+
+    - alert: backup_disk_mounted
+      expr: absent(node_filesystem_device_error{mountpoint="/media/backup"}) == 1
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Backup Disk is not mounted!"
+        description: "Backup Disk is not mounted!"
+
+    - alert: data_disk_readonly
+      expr: node_filesystem_readonly{mountpoint="/media/data"} == 1
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Nextcloud Data Disk is read only!"
+        description: "Nextcloud Data Disk is read only!"
+
+    - alert: backup_disk_readonly
+      expr: node_filesystem_readonly{mountpoint="/media/backup"} == 1
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Backup Disk is read only!"
+        description: "Backup Disk is read only!"
+
+- name: backup
+  rules:
+    - alert: backup_takes_to_long
+      expr: rsnapshot_duration_seconds > 86400
+      for: 30s
+      labels:
+        severnity: critical
+      annotations:
+        summary: "Backup takes more than 24h"
+        description: "Backup takes more than 24h"
+
+    - alert: backup_not_started
+      expr: time() - rsnapshot_start_time > 86400
+      for: 10m
+      labels:
+        severnity: critical
+      annotations:
+        summary: "Backup not started"
+        description: "Backup not started"
+
+    - alert: backup_failed
+      expr: rsync_success != 0
+      for: 30s
+      labels:
+        severnity: critical
+      annotations:
+        summary: "Backup failed"
+        description: "Backup failed"
+
+- name: service updates
+  rules:
+    - alert: update_available
+      expr: max(docker_image_pulled * 1000) without(instance,job) - max(docker_hub_image_last_updated{arch="amd64"} * 1000) without(instance,job,arch,digest,os) < 0
+      for: 2d
+      labels:
+        severnity: warning
+      annotations:
+        summary: "Updates available for some images"
+        description: "Updates available for some images"
+
+- name: services availability
+  rules:
+    - alert: mysql_down
+      expr: mysql_up != 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "MySQL Service down"
+        description: "MySQL Service down, check container"
+
+    - alert: redis_down
+      expr: redis_up != 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Redis Service down"
+        description: "Redis Service down, check container"
+
+    - alert: nginx_down
+      expr: nginx_up != 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Nginx Service down"
+        description: "Nginx Service down, check container"
+
+    - alert: nextcloud_down
+      expr: nextcloud_up != 1
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Nextcloud Service down"
+        description: "Nextcloud Service down, check container"
+
+    - alert: nextcloud_news_updater_down
+      expr: absent(container_last_seen{container_label_com_docker_compose_service="nextcloud-news-updater"}) == 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Nextcloud News Updater Service down"
+        description: "Nextcloud News Updater Service down, check container"
+
+    - alert: letsencrypt_companion_down
+      expr: absent(container_last_seen{container_label_com_docker_compose_service="letsencrypt"}) == 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "LetsEncrypt Companion Service down"
+        description: "LetsEncrypt Companion Service down, check container"
+
+#- name: containers
+#  rules:
+#  - alert: jenkins_down
+#    expr: absent(container_memory_usage_bytes{name="jenkins"})
+#    for: 30s
+#    labels:
+#      severity: critical
+#    annotations:
+#      summary: "Jenkins down"
+#      description: "Jenkins container is down for more than 30 seconds."
+
+  # - alert: jenkins_high_cpu
+  #   expr: sum(rate(container_cpu_usage_seconds_total{name="jenkins"}[1m])) / count(node_cpu_seconds_total{mode="system"}) * 100 > 10
+  #   for: 30s
+  #   labels:
+  #     severity: warning
+  #   annotations:
+  #     summary: "Jenkins high CPU usage"
+  #     description: "Jenkins CPU usage is {{ humanize $value}}%."
+
+  # - alert: jenkins_high_memory
+  #   expr: sum(container_memory_usage_bytes{name="jenkins"}) > 1200000000
+  #   for: 30s
+  #   labels:
+  #     severity: warning
+  #   annotations:
+  #     summary: "Jenkins high memory usage"
+  #     description: "Jenkins memory consumption is at {{ humanize $value}}."

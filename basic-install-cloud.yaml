@@ -1,0 +1,66 @@
+- name: (basic-install-cloud) Setup machine
+  hosts: all
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - basic
+    - disk-setup
+
+- name: (basic-install-cloud) Setup docker
+  hosts: all
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - docker
+  tags:
+    - containers
+
+
+- name: (basic-install-cloud) Setup Wireguard Server
+  hosts: all,!testsrv
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - install-wireguard
+    - setup-wireguard-server
+
+- name: (basic-install-cloud) Setup Cloud basics
+  hosts: all
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - setup-cloud-basics
+
+- name: (basic-install-cloud) Setup Cloud
+  hosts: all
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - setup-cloud-docker
+  tags:
+    - containers
+
+- name: (basic-install-cloud) Setup additional external monitoring
+  hosts: all
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - setup-monitoring-external-exporters
+  tags:
+    - containers
+
+- name: (basic-install-cloud) Setup Prometheus
+  hosts: all
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - setup-monitoring-prometheus
+  tags:
+    - containers

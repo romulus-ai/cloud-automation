@@ -1,0 +1,19 @@
+
+server {
+  listen 8080 default_server;
+
+  server_name monitoring.internal;
+
+  # These networks are considered "internal"
+  allow 127.0.0.0/8;
+  allow 10.0.0.0/8;
+  allow 192.168.0.0/16;
+  allow 172.16.0.0/12;
+
+  # Traffic from all other networks will be rejected
+  deny all;
+
+  location = /basic_status {
+    stub_status;
+  }
+}

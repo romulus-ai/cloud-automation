@@ -1,0 +1,149 @@
+- name: disable homehosts in mdadm
+  lineinfile:
+    path: /etc/mdadm/mdadm.conf
+    regexp: '^HOMEHOST'
+    line: HOMEHOST <none>
+
+#- name: enable caches at SSD Disks
+#  shell: |
+#    hdparm -W1 {{ item }}
+#  with_items: "{{ lvm.cachedisks }}"
+
+- name: disable caches at Store Disks
+  shell: |
+    hdparm -W0 {{ item }}
+  with_items: "{{ lvm.storedisks }}"
+  changed_when: false
+
+- name: make hdparm persistent
+  template:
+    src: hdparm.conf.j2
+    dest: /etc/hdparm.conf
+
+- name: create raid
+  vars:
+    raid_name: "{{ item.name }}"
+    raid_disks: "{{ item.disks }}"
+    raid_disks_count: "{{ item.diskcount }}"
+  include_tasks: create-raid.yaml
+  with_items:
+    - { "name": "{{ lvm.cacheraid }}", "disks": "{{ lvm.cachedisks | join (' ') }}", "diskcount": "{{ lvm.cachedisks | count }}"}
+    - { "name": "{{ lvm.storeraid }}", "disks": "{{ lvm.storedisks | join (' ') }}", "diskcount": "{{ lvm.storedisks | count }}"}
+    - { "name": "{{ lvm.backupraid }}", "disks": "{{ lvm.backupdisks | join (' ') }}", "diskcount": "{{ lvm.backupdisks | count }}"}
+
+### WORKAROUND - since the path of the raid becomes a _0 after reboot
+- name: workaround set raidname vars
+  set_fact:
+    storeraid: "{{ lvm.storeraid }}"
+    cacheraid: "{{ lvm.cacheraid }}"
+    backupraid: "{{ lvm.backupraid }}"
+
+- name: workaround check if _0 raid name exists
+  stat:
+    path: "{{ lvm.storeraid }}_0"
+  register: store_result
+
+- name: workaround check if _0 raid name exists
+  stat:
+    path: "{{ lvm.cacheraid }}_0"
+  register: cache_result
+
+- name: workaround check if _0 raid name exists
+  stat:
+    path: "{{ lvm.backupraid }}_0"
+  register: backup_result
+
+- name: workaround for rewrite raidname if _0 extension exists
+  set_fact:
+    storeraid: "{{ lvm.storeraid }}_0"
+  when: store_result.stat.exists
+
+- name: workaround for rewrite raidname if _0 extension exists
+  set_fact:
+    cacheraid: "{{ lvm.cacheraid }}_0"
+  when: cache_result.stat.exists
+
+- name: workaround for rewrite raidname if _0 extension exists
+  set_fact:
+    backupraid: "{{ lvm.backupraid }}_0"
+  when: backup_result.stat.exists
+
+### WORKAROUND
+
+- name: Create Volume Group
+  community.general.lvg:
+    vg: vg1
+    pvs: "{{ cacheraid }},{{ storeraid }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Check if cache pool already exists
+  shell: "lvs -a -o +devices | grep lv_data1_cache"
+  register: "lvm_cache_check"
+  changed_when: false
+  failed_when: false
+  check_mode: no
+
+- name: Create a logical cache volume
+  community.general.lvol:
+    vg: vg1
+    lv: "lv_data1_cache"
+    size: "100%PVS"
+    pvs: "{{ cacheraid }}"
+    opts: "--type cache-pool --cachemode writethrough --poolmetadatasize {{ lvm.cachemetadatasize | default(8)}}m"
+  ignore_errors: "{{ ansible_check_mode }}"
+  when: lvm_cache_check.rc != 0
+
+- name: Check if data lv already exists
+  shell: "lvs | grep 'lv_data1 '"
+  register: "lvm_store_check"
+  changed_when: false
+  failed_when: false
+  check_mode: no
+
+- name: Create a logical store volume with cache
+  community.general.lvol:
+    vg: vg1
+    lv: "lv_data1"
+    size: "100%PVS"
+    pvs: "{{ storeraid }}"
+    opts: "--type cache --cachepool vg1/lv_data1_cache"
+  ignore_errors: "{{ ansible_check_mode }}"
+  when: lvm_store_check.rc != 0
+
+- name: create filesystem
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ item }}"
+  with_items:
+    - /dev/vg1/lv_data1
+    - "{{ backupraid }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Create mountpoint directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  with_items:
+    - /media/data
+    - /media/backup
+
+- name: mount data volume
+  ansible.posix.mount:
+    path: /media/data
+    src: /dev/vg1/lv_data1
+    fstype: ext4
+    state: mounted
+  notify:
+    - create lvm mount check file
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: mount backup volume
+  ansible.posix.mount:
+    path: /media/backup
+    src: "{{ backupraid }}"
+    fstype: ext4
+    state: mounted
+  notify:
+    - create backup mount check file
+  ignore_errors: "{{ ansible_check_mode }}"

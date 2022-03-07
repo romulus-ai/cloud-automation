@@ -1,0 +1,11 @@
+- name: reload promconfig
+  uri:
+    url: http://127.0.0.1:9090/-/reload
+    method: POST
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: reload amconfig
+  uri:
+    url: http://127.0.0.1:9093/-/reload
+    method: POST
+  ignore_errors: "{{ ansible_check_mode }}"

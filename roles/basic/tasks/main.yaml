@@ -1,0 +1,87 @@
+- name: Upgrade everything
+  apt:
+    update_cache: yes
+    name: "*"
+    state: latest
+
+- name: install basic tools
+  apt:
+    pkg:
+    - vim
+    - screen
+    - htop
+    - iotop
+    - git-core
+    - jq
+    - atop
+    - net-tools
+    - mailutils
+    - smartmontools
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - software-properties-common
+    - moreutils
+    - unattended-upgrades
+    - apt-listchanges
+    - bsd-mailx
+    - nvme-cli
+
+- name: Configure Timezone
+  timezone:
+    name: Europe/Berlin
+  notify:
+    - restart timesyncd
+
+- name: Configure Timesyncd
+  template:
+    src: timesyncd.conf.j2
+    dest: /etc/systemd/timesyncd.conf
+  notify:
+    - restart timesyncd
+
+- name: configure kernel tweaks (spectre/meltdown)
+  lineinfile:
+    state: present
+    dest: /etc/default/grub
+    backrefs: yes
+    regexp: '^(GRUB_CMDLINE_LINUX_DEFAULT=(?!.* mitigations=off)\"[^\"]+)(\".*)'
+    line: '\1 mitigations=off\2'
+  when: ansible_architecture == "x86_64"
+  notify:
+    - apply kernel tweaks
+    - reboot system
+
+- name: remove installed snap packages
+  shell:
+    cmd: |
+      snap remove lxd
+      sleep 3
+      for pkg in $(snap list | awk '{print $1}' | grep -v Name) ; do snap remove $pkg ; done
+    removes: /usr/bin/snap
+
+- name: remove snap package
+  apt:
+    name: snapd
+    state: absent
+    purge: yes
+  notify:
+    - reboot system
+
+- name: enable and start atop
+  service:
+    name: atop
+    state: started
+    enabled: true
+
+- name: configure unattended-upgrades
+  template:
+    src: unattended-upgrades/{{ item }}.j2
+    dest: /etc/apt/apt.conf.d/{{ item }}
+  with_items:
+    - 10periodic
+    - 50unattended-upgrades
+
+- name: install ansible on the box
+  include: ansible.yaml
+  when: offside == false

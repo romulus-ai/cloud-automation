@@ -1,0 +1,34 @@
+
+- name: install packages
+  apt:
+    pkg:
+      - rsnapshot
+      - mysql-client
+      - smbclient
+
+- name: configure rsnapshot
+  include_tasks: configure-rsnapshot.yaml
+
+- name: install update-images.sh
+  copy:
+    src: update-images.sh
+    dest: /usr/local/bin/update-images.sh
+    mode: '0754'
+
+- name: configure logrotate for update-images.sh
+  copy:
+    src: "update-images-logrotate"
+    dest: "/etc/logrotate.d/update-images"
+    mode: '0644'
+    owner: "root"
+    group: "root"
+
+- name: Creates daily update-images.sh
+  cron:
+    name: imageupdate daily
+    minute: "0"
+    hour: "7"
+    user: root
+    job: "/usr/local/bin/update-images.sh"
+    cron_file: "/etc/crontab"
+    disabled: "{{ testenv | default(no) }}"

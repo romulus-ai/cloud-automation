@@ -1,0 +1,9 @@
+#!/bin/bash
+
+COMPOSEDIR="${$1:-/root/docker-compose/}"
+
+for SUBDIR in $(ls ${COMPOSEDIR}) ; do
+  if [ -e ${COMPOSEDIR}/${SUBDIR}/docker-compose.yaml ] ; then
+    docker-compose -p cloud -f ${COMPOSEDIR}/${SUBDIR}/docker-compose.yaml up -d
+  fi
+done

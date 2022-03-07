@@ -1,0 +1,137 @@
+version: "2.4"
+services:
+
+  db:
+    image: percona:8
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    volumes:
+      - /opt/cloud-docker/mysql/data:/var/lib/mysql
+      - /opt/cloud-docker/mysql/files:/var/lib/mysql-files
+      - ./my.cnf:/etc/my.cnf
+      - /mnt/backup-views:/mnt/backup-views
+    environment:
+      - MYSQL_ROOT_PASSWORD={{ mysql.root_password }}
+      - MYSQL_PASSWORD={{ mysql.cloud_password }}
+      - MYSQL_DATABASE=owncloud
+      - MYSQL_USER=owncloud
+    cap_add:
+      - SYS_NICE
+    security_opt:
+      - seccomp:unconfined
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-S", "/var/run/mysqld/mysqld.sock", "-u", "root", "-p{{ mysql.root_password }}"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
+
+  redis:
+    image: redis:6-alpine
+    restart: unless-stopped
+    command: redis-server /etc/redis.conf
+    volumes:
+      - ./redis.conf:/etc/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli" ,"info"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
+
+  nginx-proxy:
+    image: jwilder/nginx-proxy:alpine
+    restart: unless-stopped
+    labels:
+      - "com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    expose:
+      - 8080
+    volumes:
+      - /opt/cloud-docker/nginx/certs:/etc/nginx/certs
+      - /opt/cloud-docker/nginx/vhost.d:/etc/nginx/vhost.d
+      - /opt/cloud-docker/nginx/data:/usr/share/nginx/html
+      - /opt/cloud-docker/nginx/htpasswd:/etc/nginx/htpasswd
+      - ./stub-status-vhost.conf:/etc/nginx/conf.d/stub-status-vhost.conf
+      - ./nginx-custom-proxy-settings.conf:/etc/nginx/conf.d/nginx-custom-proxy-settings.conf
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    environment:
+      - DEFAULT_HOST=cloud.tbruckmann.de
+      - SSL_POLICY=Mozilla-Intermediate
+      - HSTS=max-age=15768000; includeSubDomains; preload
+    restart: always
+
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion:latest
+    restart: unless-stopped
+    volumes_from:
+      - nginx-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DEFAULT_EMAIL=thomas.bruckmann@posteo.de
+    depends_on:
+      - nginx-proxy
+
+  nextcloud:
+    image: nextcloud:22-apache
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - /media/data/nextcloud/install:/var/www/html
+      - /media/data/nextcloud/data:/data
+      - ./nc-php.ini:/usr/local/etc/php/conf.d/nc-php.ini
+    environment:
+      - VIRTUAL_HOST=cloud.tbruckmann.de,owncloud.tbruckmann.de
+      - LETSENCRYPT_HOST=cloud.tbruckmann.de,owncloud.tbruckmann.de
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      letsencrypt:
+        condition: service_started
+      nginx-proxy:
+        condition: service_started
+    links:
+      - redis
+      - db
+
+  cron:
+    image: nextcloud:22-apache
+    restart: always
+    volumes:
+      - /media/data/nextcloud/install:/var/www/html
+      - /media/data/nextcloud/data:/data
+      # if some day more cronjobs are needed
+      #      - ./mycronfile:/var/spool/cron/crontabs/www-data
+    entrypoint: /cron.sh
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    links:
+      - redis
+      - db
+
+  nextcloud-news-updater:
+    image: romulusai/nextcloud-news-updater:latest
+    command: --apilevel v15 --mode endless /nextcloud
+    restart: unless-stopped
+    volumes:
+      - /media/data/nextcloud/install:/nextcloud
+    depends_on:
+      - nextcloud
+
+  clamav:
+    image: romulusai/clamav-fully-loaded:latest
+    restart: unless-stopped
+    cpus: 2
+    ports:
+      - "3310:3310"

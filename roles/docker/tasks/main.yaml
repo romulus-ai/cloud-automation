@@ -1,0 +1,95 @@
+- name: Install requirements
+  apt:
+    name:
+      - python3-pip
+    state: present
+
+- name: install ctop on raspi
+  get_url:
+    url: https://github.com/bcicen/ctop/releases/download/v0.7.5/ctop-0.7.5-linux-arm64
+    dest: /usr/local/bin/ctop
+    mode: '0755'
+  when: ansible_architecture == "aarch64"
+
+- name: install docker-compose (arm64) deps
+  apt:
+    name:
+      - libffi-dev
+      - libssl-dev
+    state: present
+  when: ansible_architecture == "aarch64"
+
+- name: remove disturbing packages for docker-compose (arm64)
+  apt:
+    name: python-configparser
+    state: absent
+  when: ansible_architecture == "aarch64"
+
+- name: Remove evil python packages
+  pip:
+    name:
+      - docker-py
+      - docker-pycreds
+    state: absent
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Install python dependencies
+  pip:
+    name:
+      - docker
+      - PyYAML
+      - openshift
+      - pyOpenSSL
+      - docker-compose
+      - passlib
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: add docker repo key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add docker repository for amd64 ubuntu
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+    state: present
+  when: ansible_architecture == "x86_64"
+
+- name: Add docker repository for arm64 ubuntu
+  apt_repository:
+    repo: deb [arch=arm64] https://download.docker.com/linux/ubuntu focal stable
+    state: present
+  when: ansible_architecture == "aarch64"
+
+- name: install docker-ce
+  apt:
+    name: docker-ce
+    state: present
+    update_cache: yes
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: install docker-compose (amd64)
+  get_url:
+    url: https://github.com/docker/compose/releases/download/1.27.4/docker-compose-Linux-x86_64
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+  when: ansible_architecture == "x86_64"
+
+- name: Prune unused Images hourly
+  cron:
+    name: prune unused images hourly
+    special_time: "hourly"
+    user: root
+    job: "/usr/bin/docker container prune -f && /usr/bin/docker image prune -a -f"
+    cron_file: "/etc/crontab"
+
+- name: store start-all-compose.sh
+  template:
+    src: "start-all-compose.sh.j2"
+    dest: "/root/start-all-compose.sh"
+    owner: "root"
+    group: "root"
+    mode: '0740'
+
+- name: configure docker and node monitoring
+  include_tasks: monitoring.yaml

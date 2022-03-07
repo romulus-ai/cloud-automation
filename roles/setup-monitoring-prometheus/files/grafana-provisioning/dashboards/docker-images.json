@@ -1,0 +1,232 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": 16,
+  "links": [],
+  "panels": [
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": null,
+            "filterable": true
+          },
+          "mappings": [],
+          "noValue": "not on Dockerhub",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "dateTimeAsLocal"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Image Age"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Needs Update"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "from": "-999999999999999999999",
+                    "id": 1,
+                    "text": "Yes",
+                    "to": "0",
+                    "type": 2
+                  },
+                  {
+                    "from": "0",
+                    "id": 2,
+                    "text": "No",
+                    "to": "99999999999999999999",
+                    "type": 2
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 23,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "id": 8,
+      "options": {
+        "frameIndex": 0,
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "7.3.5",
+      "targets": [
+        {
+          "expr": "sort(max(docker_image_pulled * 1000) without(instance,job))",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "expr": "max(docker_hub_image_last_updated{arch=\"amd64\"} * 1000) without(instance,job,arch,digest,os)",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
+        },
+        {
+          "expr": "time() - max(docker_hub_image_last_updated{arch=\"amd64\"}) without(instance,job,arch,digest,os)",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "C"
+        },
+        {
+          "expr": "max(docker_image_pulled * 1000) without(instance,job,tag) - max(docker_hub_image_last_updated{arch=\"amd64\"} * 1000) without(instance,job,arch,digest,os,tag)",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "D"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Image Update Info",
+      "transformations": [
+        {
+          "id": "seriesToColumns",
+          "options": {
+            "byField": "image"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "tag 1": true,
+              "tag 3": true,
+              "tag 4": true,
+              "user 2": true,
+              "user 3": true,
+              "user 4": true
+            },
+            "indexByName": {
+              "Time 1": 4,
+              "Time 2": 6,
+              "Value #A": 5,
+              "Value #B": 8,
+              "image": 1,
+              "tag 1": 2,
+              "tag 2": 3,
+              "user 1": 0,
+              "user 2": 7
+            },
+            "renameByName": {
+              "Value #A": "Image pulled",
+              "Value #B": "Dockerhub last updated",
+              "Value #C": "Image Age",
+              "Value #D": "Needs Update",
+              "image": "Image",
+              "user 1": "User"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 26,
+  "style": "dark",
+  "tags": [
+    "docker"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
+  },
+  "timezone": "",
+  "title": "Docker Images",
+  "uid": "XsMEtCgiz",
+  "version": 12
+}

@@ -1,0 +1,7 @@
+- name: import SSR Trainings Telefit
+  hosts: cloud2
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - insert-ssrtrainings

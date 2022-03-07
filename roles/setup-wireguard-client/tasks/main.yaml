@@ -1,0 +1,77 @@
+- name: Copy Clientkeys from Wireguard Server to Client (1/2)
+  fetch:
+    src: "/etc/wireguard/{{ wireguard.client_name }}.{{ item }}"
+    dest: "buffer/{{ wireguard.client_name }}.{{ item }}"
+    flat: yes
+  with_items:
+    - "private.key"
+    - "public.key"
+  delegate_to: wireguard_server
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Copy Clientkeys from Wireguard Server to Client (2/2)
+  copy:
+    src: "buffer/{{ wireguard.client_name }}.{{ item }}"
+    dest: "/etc/wireguard/{{ wireguard.client_name }}.{{ item }}"
+  with_items:
+    - "private.key"
+    - "public.key"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Copy Server Public Key from Wireguard Server to Client (1/2)
+  fetch:
+    src: "/etc/wireguard/server.public.key"
+    dest: "buffer/server.public.key"
+    flat: yes
+  delegate_to: wireguard_server
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Copy Server Public Key from Wireguard Server to Client (2/2)
+  copy:
+    src: "buffer/server.public.key"
+    dest: "/etc/wireguard/server.public.key"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: read wireguard client private key
+  shell:
+    cmd: "cat /etc/wireguard/{{ wireguard.client_name }}.private.key"
+  register: wireguard_privatekey
+
+- name: read wireguard client public key
+  shell:
+    cmd: "cat /etc/wireguard/{{ wireguard.client_name }}.public.key"
+  register: wireguard_publickey
+
+- name: read wireguard server public key
+  shell:
+    cmd: "cat /etc/wireguard/server.public.key"
+  register: wireguard_server_publickey
+
+- name: adjust key permissions
+  file:
+    path: "{{ item }}"
+    mode: '0600'
+    owner: root
+    group: root
+  with_items:
+    - /etc/wireguard/{{ wireguard.client_name }}.private.key
+    - /etc/wireguard/{{ wireguard.client_name }}.public.key
+
+- name: configure wireguard
+  template:
+    src: wg0-client.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: '0600'
+  vars:
+    privatekey: "{{ wireguard_privatekey }}"
+    serverpubkey: "{{ wireguard_server_publickey }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: start wireguard
+  service:
+    name: "wg-quick@wg0.service"
+    state: started
+    enabled: yes
+    masked: no
+    daemon_reload: yes
+  ignore_errors: "{{ ansible_check_mode }}"

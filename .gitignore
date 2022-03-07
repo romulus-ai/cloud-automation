@@ -1,0 +1,4 @@
+*.secret
+.vagrant
+buffer
+vault.password

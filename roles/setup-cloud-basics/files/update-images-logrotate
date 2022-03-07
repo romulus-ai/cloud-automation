@@ -1,0 +1,9 @@
+/var/log/update-images.log {
+	rotate 30
+	daily
+	compress
+	delaycompress
+	missingok
+	notifempty
+	copytruncate
+}

@@ -1,0 +1,97 @@
+# TODO:
+#   1. Stoppen des Nextcloud Containers
+#   2. Restore der Datenbank
+#   3. Restore der Daten
+
+- name: prepare testbackup (skipped in testenv)
+  ansible.posix.synchronize:
+    src: /Users/thomasbruckmann/workspace-private/backup-test-cloud/rsnapshot
+    dest: /media/backup/
+  when: testenv
+
+- name: set testbackup permissions (skipped in testenv)
+  file:
+    path: /media/backup/
+    owner: "33"
+    group: "33"
+    recurse: yes
+  when: testenv
+
+- name: install needed packages
+  apt:
+    pkg:
+    - mysql-client
+
+- name: Check if nextcloud runs
+  shell: "docker ps | grep -v monitoring | grep nextcloud"
+  register: "nextcloud_container_check"
+  changed_when: false
+  failed_when: false
+  check_mode: no
+
+- name: Stop Nextcloud Containers when running
+  shell:
+    cmd: |
+      docker stop cloud_nextcloud_1
+      docker stop cloud_nextcloud-news-updater_1
+  when: nextcloud_container_check.rc == 0
+
+- name: add config.php
+  template:
+    src: nextcloud-config.php.j2
+    dest: /media/data/nextcloud/install/config/config.php
+    owner: "33"
+    mode: 0640
+
+# - name: Restore MySQL DB
+#   shell:
+#     cmd: |
+#       mysql -h 127.0.0.1 -P 3306 -u owncloud -p{{ mysql.cloud_password }} owncloud < /media/backup/rsnapshot/daily.0/owncloud-database/owncloud.sql && echo "RESTORE SUCCESS $(date)" > /media/backup/restore.success
+#     creates: /media/backup/restore.success
+
+#- name: Restore Nextcloud installation
+#  ansible.posix.synchronize:
+#    src: /media/BACKUP/rsnapshot/daily.0/owncloud-documentroot/var/www/owncloud/
+#    dest: /media/data/nextcloud/install/
+#  delegate_to: "{{ inventory_hostname }}"
+
+# -> DONE bis hier
+# TODO: Manuell, da es zu lange dauern würde
+#- name: Restore Nextcloud Data
+#  ansible.posix.synchronize:
+#    src: /media/backup/rsnapshot/daily.0/owncloud-data/media/DATA/owncloud-data/
+#    dest: /media/data/nextcloud/data/
+#  delegate_to: "{{ inventory_hostname }}"
+
+#- name: Start all the cloud containers again
+#  community.general.docker_compose:
+#    project_src: /root/docker-compose/cloud
+#    pull: yes
+#  register: output
+
+# - name: ensure cloud docker environment runs
+#   ansible.builtin.assert:
+#     that:
+#       # wenn das nicht geht, mal mit arra schreibweise testen
+#       - output["services"]["db"]["cloud_db_1"]["state"]["running"]
+#       - output["services"]["redis"]["cloud_redis_1"]["state"]["running"]
+#       - output["services"]["nginx-proxy"]["cloud_nginx-proxy_1"]["state"]["running"]
+#       - output["services"]["letsencrypt"]["cloud_letsencrypt_1"]["state"]["running"]
+#       - output["services"]["nextcloud"]["cloud_nextcloud_1"]["state"]["running"]
+#       - output["services"]["nextcloud-news-updater"]["cloud_nextcloud-news-updater_1"]["state"]["running"]
+
+# - name: add additional apps to nextcloud
+#   shell:
+#     cmd: "docker exec --user www-data -it cloud_nextcloud_1 php occ app:install {{ item }}"
+#     creates: "/media/data/nextcloud/install/custom_apps/{{ item }}"
+#   with_items:
+#     - calendar
+#     - contacts
+#     - cookbook
+#     - deck
+#     - keeweb
+#     - news
+#     - notes
+#     - ransomware_protection
+#     - suspicious_login
+#     - tasks

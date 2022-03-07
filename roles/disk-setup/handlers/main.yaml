@@ -1,0 +1,9 @@
+- name: create lvm mount check file
+  shell:
+    cmd: "echo $(date) > /media/data/do_no_delete_monit_mount_check_file"
+    creates: /media/data/do_no_delete_monit_mount_check_file
+
+- name: create backup mount check file
+  shell:
+    cmd: "echo $(date) > /media/data/do_no_delete_monit_mount_check_file"
+    creates: /media/data/do_no_delete_monit_mount_check_file

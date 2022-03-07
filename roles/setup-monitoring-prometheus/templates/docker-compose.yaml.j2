@@ -1,0 +1,72 @@
+version: "2.4"
+services:
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    command: --storage.tsdb.retention.time=183d --storage.tsdb.path=/prometheus --config.file=/etc/prometheus/prometheus.yaml --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - /opt/monitoring-docker/prometheus/config:/etc/prometheus
+      - /opt/monitoring-docker/prometheus/data:/prometheus
+    environment:
+      - VIRTUAL_HOST=prometheus.tbruckmann.de
+      - LETSENCRYPT_HOST=prometheus.tbruckmann.de
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    restart: unless-stopped
+    command: --config.file=/etc/alertmanager/alertmanager.yaml --storage.path=/alertmanager --web.external-url=http://alertmanager.tbruckmann.de
+    ports:
+      - "9093:9093"
+    volumes:
+      - /opt/monitoring-docker/alertmanager/config:/etc/alertmanager
+      - /opt/monitoring-docker/alertmanager/data:/alertmanager
+    environment:
+      - VIRTUAL_HOST=alertmanager.tbruckmann.de
+      - LETSENCRYPT_HOST=alertmanager.tbruckmann.de
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - /opt/monitoring-docker/grafana/config/grafana.ini:/etc/grafana/grafana.ini
+      - /opt/monitoring-docker/grafana/provisioning:/etc/grafana/provisioning
+      - /opt/monitoring-docker/grafana/data:/var/lib/grafana
+    environment:
+      - GF_INSTALL_PLUGINS=camptocamp-prometheus-alertmanager-datasource,yesoreyeram-boomtable-panel,flant-statusmap-panel
+      - VIRTUAL_HOST=monitor.tbruckmann.de
+      - LETSENCRYPT_HOST=monitor.tbruckmann.de
+
+  pushgateway:
+    image: prom/pushgateway:latest
+    ports:
+      - "9091:9091"
+    restart: unless-stopped
+
+  ssllabsexporter:
+    image: anasaso/ssllabs_exporter:latest
+    restart: unless-stopped
+    expose:
+      - 19115
+
+  blackboxexporter:
+    image: prom/blackbox-exporter:master
+    restart: unless-stopped
+    expose:
+      - 9115
+
+  # get list of all used images:
+  # grep image: roles/*/templates/docker-compose.yaml.j2 | grep -v gcr | awk '{print $3}' | sort | uniq
+  dockerhubexporter:
+    image: romulusai/docker-hub-exporter:latest
+    command:
+      - '-images=anasaso/ssllabs_exporter:latest,eclipse-mosquitto:1.6,grafana/grafana:latest,hikhvar/mqtt2prometheus:latest,hikhvar/mqtt2prometheus:latest-arm64,jrcs/letsencrypt-nginx-proxy-companion:latest,jwilder/nginx-proxy:alpine,miguelndecarvalho/speedtest-exporter:latest,mxschmitt/fritzbox_exporter:latest,mxschmitt/fritzbox_exporter:latest-arm64v8,nextcloud:20-apache,percona:8,prom/alertmanager:latest,prom/blackbox-exporter:master,prom/node-exporter:latest,prom/prometheus:latest,prom/pushgateway:latest,redis:6-alpine,romulusai/clamav-fully-loaded:latest,romulusai/docker-hub-exporter:latest,romulusai/nextcloud-news-updater:latest,romulusai/roomba-exporter:latest,romulusai/roomba-exporter:latest-arm64,zcube/cadvisor:latest'
+    restart: unless-stopped
+    #ports:
+    #  - "9170:9170"
+    expose:
+      - 9170

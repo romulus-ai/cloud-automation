@@ -1,0 +1,70 @@
+<?php
+$CONFIG = array (
+  'htaccess.RewriteBase' => '/',
+  'memcache.local' => '\\OC\\Memcache\\APCu',
+  'apps_paths' =>
+  array (
+    0 =>
+    array (
+      'path' => '/var/www/html/apps',
+      'url' => '/apps',
+      'writable' => false,
+    ),
+    1 =>
+    array (
+      'path' => '/var/www/html
+      'url' => '/custom_apps',
+      'writable' => true,
+    ),
+  ),
+  'memcache.distributed' => '\\OC\\Memcache\\Redis',
+  'memcache.locking' => '\\OC\\Memcache\\Redis',
+  'redis' =>
+  array (
+    'host' => 'redis',
+    'port' => 6379,
+  ),
+  'mail_smtpmode' => 'smtp',
+  'mail_smtphost' => 'posteo.de',
+  'mail_smtpport' => '587',
+  'mail_smtpsecure' => 'tls',
+  'mail_smtpauth' => true,
+  'mail_smtpauthtype' => 'PLAIN',
+  'mail_smtpname' => 'thomas.bruckmann@posteo.de',
+  'mail_smtppassword' => '{{ cloud.smtp_password }}',
+  'mail_from_address' => 'thomas.bruckmann',
+  'mail_domain' => 'posteo.de',
+  'instanceid' => 'ocb026defcbe',
+  'passwordsalt' => '{{ cloud.password_salt }}',
+  'secret' => '{{ cloud.secret }}',
+  'trusted_domains' =>
+  array (
+    1 => '192.168.2.2',
+    2 => '192.168.178.201',
+    3 => 'owncloud.tbruckmann.de',
+    4 => 'cloud.tbruckmann.de',
+  ),
+  'datadirectory' => '/data',
+  'dbtype' => 'mysql',
+  'version' => '19.0.6.2',
+  'overwrite.cli.url' => 'https://cloud.tbruckmann.de',
+  'overwriteprotocol' => 'https',
+  'dbname' => 'owncloud',
+  'dbhost' => 'db',
+  'dbtableprefix' => 'oc_',
+  'mysql.utf8mb4' => true,
+  'dbuser' => 'owncloud',
+  'dbpassword' => '{{ mysql.cloud_password }}',
+  'installed' => true,
+  'enable_previews' => 'false',
+  'loglevel' => '2',
+  'logtimezone' => 'Europe/Berlin',
+  'trashbin_retention_obligation' => 'auto',
+  'appcodechecker' => 'false',
+  'default_language' => 'de',
+  'default_locale' => 'de_DE',
+  'updater.release.channel' => 'stable',
+  'config_is_read_only' => false,
+  'theme' => '',
+  'maintenance' => false,
+);

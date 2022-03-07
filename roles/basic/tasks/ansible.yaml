@@ -1,0 +1,35 @@
+# installs ansible on the ubuntu box
+- name: Remove evil python packages
+  pip:
+    name:
+      - docker-py
+      - docker-pycreds
+    state: absent
+  tags:
+    - check-env
+
+- name: Install python dependencies
+  pip:
+    name:
+      - ansible
+      - docker
+      - PyYAML
+      - openshift
+      - pyOpenSSL
+  tags:
+    - check-env
+
+- name: Install ansible-galaxy modules
+  shell:
+    cmd: "ansible-galaxy collection install community.general community.kubernetes community.crypto"
+  register: "galaxy_install"
+  changed_when: false
+  tags:
+    - check-env
+
+- name: ansible-galaxy install result
+  debug:
+    msg: "stdout: {{ galaxy_install.stdout }}\nstderr: {{ galaxy_install.stderr }}"
+  when: galaxy_install is defined and galaxy_install.changed
+  tags:
+    - check-env

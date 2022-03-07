@@ -1,0 +1,36 @@
+- name: (basic-install-raspi) Setup machine
+  hosts: all,!wireguard_server
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - basic
+
+- name: (basic-install-raspi) Setup docker
+  hosts: all,!wireguard_server
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - docker
+  tags:
+    - containers
+
+- name: (basic-install-raspi) Setup Wireguard Client
+  hosts: all,!wireguard_server
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - install-wireguard
+    - setup-wireguard-client
+
+- name: (basic-install-raspi) Setup Monitoring
+  hosts: all,!wireguard_server
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - setup-monitoring-external-exporters
+  tags:
+    - containers

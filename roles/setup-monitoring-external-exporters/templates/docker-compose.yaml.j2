@@ -1,0 +1,89 @@
+version: "2.4"
+services:
+
+  mqtt:
+    image: eclipse-mosquitto:1.6
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mosquitto-passwords:/mosquitto/config/mosquitto-passwords
+      - /opt/electricity-monitor-docker/mosquitto/data:/mosquitto/data
+
+  mqttexporter:
+{% if ansible_architecture == "aarch64" %}
+    image: hikhvar/mqtt2prometheus:latest-arm64
+{% else %}
+    image: hikhvar/mqtt2prometheus:latest
+{% endif %}
+    command: /mqtt2prometheus -config /config.yaml
+    restart: unless-stopped
+    volumes:
+      - ./mqtt-exporter.yaml:/config.yaml
+{% if offside %}
+    ports:
+      - "9641:9641"
+    depends_on:
+      - mqtt
+{% else %}
+    expose:
+      - 9641
+{% endif %}
+
+  fritzboxexporter:
+{% if ansible_architecture == "aarch64" %}
+    image: mxschmitt/fritzbox_exporter:latest-arm64v8
+{% else %}
+    image: mxschmitt/fritzbox_exporter:latest
+{% endif %}
+    command: -gateway-address {{ prometheus.fritzbox_address }}
+    restart: unless-stopped
+{% if offside %}
+    ports:
+      - "9133:9133"
+    depends_on:
+      - mqttexporter
+{% else %}
+    expose:
+      - 9133
+{% endif %}
+
+  speedtestexporter:
+    image: miguelndecarvalho/speedtest-exporter:latest
+    restart: unless-stopped
+    environment:
+      - SPEEDTEST_PORT=9102
+{% if offside %}
+    ports:
+      - "9102:9102"
+    depends_on:
+      - fritzboxexporter
+{% else %}
+    expose:
+      - 9102
+{% endif %}
+
+{% if roomba.address is defined %}
+  roombaexporter:
+{% if ansible_architecture == "aarch64" %}
+    image: romulusai/roomba-exporter:latest-arm64
+{% else %}
+    image: romulusai/roomba-exporter:latest
+{% endif %}
+    restart: unless-stopped
+    environment:
+      - ROOMBA_IP_ADDRESS={{ roomba.address }}
+      - USERNAME={{ roomba.blid }}
+      - PASSWORD={{ roomba.password }}
+{% if offside %}
+    ports:
+      - "9117:9117"
+    depends_on:
+      - speedtestexporter
+{% else %}
+    expose:
+      - 9117
+{% endif %}
+{% endif %}

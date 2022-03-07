@@ -1,0 +1,103 @@
+# Settings for the MQTT Client. Currently only these three are supported
+mqtt:
+  # The MQTT broker to connect to
+  server: tcp://mqtt:1883
+  user: mosquser
+  password: Karlsberg123#
+  # The Topic path to subscribe to. Be aware that you have to specify the wildcard.
+  topic_path: tele/+/SENSOR
+  # Optional: Regular expression to extract the device ID from the topic path. The default regular expression, assumes
+  # that the last "element" of the topic_path is the device id.
+  # The regular expression must contain a named capture group with the name deviceid
+  # For example the expression for tasamota based sensors is "tele/(?P<deviceid>.*)/.*"
+  device_id_regex: "tele/(?P<deviceid>.*)/.*"
+  # The MQTT QoS level
+  qos: 0
+cache:
+  # Timeout. Each received metric will be presented for this time if no update is send via MQTT
+  timeout: 24h
+# This is a list of valid metrics. Only metrics listed here will be exported
+metrics:
+    # The name of the metric in prometheus
+  - prom_name: tasmota_power_watt
+    # The name of the metric in a MQTT JSON message. This can be an arbitrary gojsonq path.
+    mqtt_name: ENERGY.Power
+    # The prometheus help text for this metric
+    help: Currently used Power in Watts
+    # The prometheus type for this metric. Valid values are: "gauge" and "counter"
+    type: gauge
+    # A map of string to string for constant labels. This labels will be attached to every prometheus metric
+    const_labels:
+      sensor_type: delock_11827
+    # The name of the metric in prometheus
+  - prom_name: tasmota_apparentpower_va
+    # The name of the metric in a MQTT JSON message
+    mqtt_name: ENERGY.ApparentPower
+    # The prometheus help text for this metric
+    help: Apperent Power or Scheinleitung in VA
+    # The prometheus type for this metric. Valid values are: "gauge" and "counter"
+    type: gauge
+    # A map of string to string for constant labels. This labels will be attached to every prometheus metric
+    const_labels:
+      sensor_type: delock_11827
+    # The name of the metric in prometheus
+  - prom_name: tasmota_reactivepower_var
+    # The name of the metric in a MQTT JSON message. Here a nested field.
+    mqtt_name: ENERGY.ReactivePower
+    # The prometheus help text for this metric
+    help: Reactive Power or Blindleistung in VAr
+    # The prometheus type for this metric. Valid values are: "gauge" and "counter"
+    type: gauge
+    # A map of string to string for constant labels. This labels will be attached to every prometheus metric
+    const_labels:
+      sensor_type: delock_11827
+  - prom_name: tasmota_voltage
+    # The name of the metric in a MQTT JSON message. Here a nested field.
+    mqtt_name: ENERGY.Voltage
+    # The prometheus help text for this metric
+    help: Currently used Voltage
+    # The prometheus type for this metric. Valid values are: "gauge" and "counter"
+    type: gauge
+    # A map of string to string for constant labels. This labels will be attached to every prometheus metric
+    const_labels:
+      sensor_type: delock_11827
+  - prom_name: tasmota_ampere
+    # The name of the metric in a MQTT JSON message. Here a nested field.
+    mqtt_name: ENERGY.Current
+    # The prometheus help text for this metric
+    help: Currently used Ampere
+    # The prometheus type for this metric. Valid values are: "gauge" and "counter"
+    type: gauge
+    # A map of string to string for constant labels. This labels will be attached to every prometheus metric
+    const_labels:
+      sensor_type: delock_11827
+  - prom_name: tasmota_total_power_kwh
+    # The name of the metric in a MQTT JSON message. Here a nested field.
+    mqtt_name: ENERGY.Total
+    # The prometheus help text for this metric
+    help: Total used kwh
+    # The prometheus type for this metric. Valid values are: "gauge" and "counter"
+    type: counter
+    # A map of string to string for constant labels. This labels will be attached to every prometheus metric
+    const_labels:
+      sensor_type: delock_11827
+  - prom_name: tasmota_today_power_kwh
+    # The name of the metric in a MQTT JSON message. Here a nested field.
+    mqtt_name: ENERGY.Today
+    # The prometheus help text for this metric
+    help: Today used kwh
+    # The prometheus type for this metric. Valid values are: "gauge" and "counter"
+    type: counter
+    # A map of string to string for constant labels. This labels will be attached to every prometheus metric
+    const_labels:
+      sensor_type: delock_11827
+  - prom_name: tasmota_yesterday_power_kwh
+    # The name of the metric in a MQTT JSON message. Here a nested field.
+    mqtt_name: ENERGY.Yesterday
+    # The prometheus help text for this metric
+    help: Yesterday used kwh
+    # The prometheus type for this metric. Valid values are: "gauge" and "counter"
+    type: counter
+    # A map of string to string for constant labels. This labels will be attached to every prometheus metric
+    const_labels:
+      sensor_type: delock_11827

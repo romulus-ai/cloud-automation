@@ -1,0 +1,74 @@
+- name: create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: 0755
+  with_items:
+    - { "path": "/root/docker-compose", "owner": "root", "group": "root" }
+    - { "path": "/root/docker-compose/monitoring-node", "owner": "root", "group": "root" }
+    - { "path": "/opt/monitoring-docker/nodeexporter/collector-textfiles", "owner": "root", "group": "root" }
+
+- name: add textfile collector from remote
+  get_url:
+    url: "{{ item.url }}"
+    dest: "/usr/local/bin/{{ item.name }}"
+    mode: '0754'
+  with_items:
+    - { "url": "https://github.com/kormat/rsnap_prom_stats/releases/download/v0.4/rsnap_prom_stats-v0.4.par", "name": "rsnap_prom_stats" }
+    - { "url": "https://raw.githubusercontent.com/prometheus-community/node-exporter-textfile-collector-scripts/master/smartmon.sh", "name": "smartmon.sh" }
+    - { "url": "https://raw.githubusercontent.com/prometheus-community/node-exporter-textfile-collector-scripts/master/nvme_metrics.sh", "name": "nvme_metrics.sh" }
+    - { "url": "https://raw.githubusercontent.com/prometheus-community/node-exporter-textfile-collector-scripts/master/apt.sh", "name": "apt.sh" }
+
+- name: add textfile collector for some docker image metrics
+  copy:
+    src: docker-image-metrics.sh
+    dest: "/usr/local/bin/docker-image-metrics.sh"
+    mode: '0754'
+
+- name: add cronjobs for node-exporter textfile execution
+  cron:
+    name: "{{ item.name }}"
+    minute: "*/30"
+    user: root
+    job: "{{ item.cmd }}"
+    cron_file: /etc/crontab
+  with_items:
+    - { "name": "check smart values", "cmd": "/usr/local/bin/smartmon.sh | sponge /opt/monitoring-docker/nodeexporter/collector-textfiles/smartmon.prom" }
+    - { "name": "check docker image metrics", "cmd": "/usr/local/bin/docker-image-metrics.sh | sponge /opt/monitoring-docker/nodeexporter/collector-textfiles/docker-image-metrics.prom" }
+    - { "name": "check security update count", "cmd": "unattended-upgrade --dry-run -d 2> /dev/null | grep 'Checking' | wc -l | sed -ne 's/^\\([0-9]\\+\\).*$/security_updates_count \\1/p' | sponge /opt/monitoring-docker/nodeexporter/collector-textfiles/security-updates.prom" }
+    - { "name": "check if reboot required", "cmd": "ls /var/run/ | grep reboot-required | wc -l | sed -ne 's/^\\([0-9]\\+\\).*$/reboot_required \\1/p' | sponge /opt/monitoring-docker/nodeexporter/collector-textfiles/reboot-required.prom" }
+    - { "name": "check nvme disk stats", "cmd": "/usr/local/bin/nvme_metrics.sh | sponge /opt/monitoring-docker/nodeexporter/collector-textfiles/nvme-metrics.prom" }
+    - { "name": "check apt", "cmd": "/usr/local/bin/apt.sh | sponge /opt/monitoring-docker/nodeexporter/collector-textfiles/apt.prom" }
+
+- name: store node monitoring docker-compose file
+  template:
+    src: "docker-compose.yaml.j2"
+    dest: "/root/docker-compose/monitoring-node/docker-compose.yaml"
+    owner: "root"
+    group: "root"
+
+- name: deploy node monitoring
+  community.general.docker_compose:
+    project_src: /root/docker-compose/monitoring-node
+    project_name: cloud
+    pull: yes
+  register: output
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: ensure node monitoring runs
+  ansible.builtin.assert:
+    that:
+      - output["services"]["nodeexporter"]["cloud_nodeexporter_1"]["state"]["running"]
+      - output["services"]["cadvisor"]["cloud_cadvisor_1"]["state"]["running"]
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: add container start cronjob
+  cron:
+    name: ensure to all containers running once a day
+    special_time: "daily"
+    user: root
+    job: "for i in $(ls /root/docker-compose/) ; do docker-compose -p cloud -f /root/docker-compose/$i/docker-compose.yaml up -d ; done"
+    cron_file: "/etc/crontab"
+    disabled: "{{ testenv | default(no) }}"

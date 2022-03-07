@@ -1,0 +1,18 @@
+route:
+  repeat_interval: 6h
+  receiver: "mail"
+
+receivers:
+  - name: "mail"
+    email_configs:
+      - to: thomas.bruckmann@posteo.de
+        from: thomas.bruckmann@posteo.de
+        smarthost: posteo.de:587
+        hello: cloud.tbruckmann.de
+        auth_username: thomas.bruckmann@posteo.de
+        auth_password: {{ cloud.smtp_password }}
+        require_tls: true
+        send_resolved: true
+        {% raw %}
+        text: "summary: {{ .CommonAnnotations.summary }}\ndescription: {{ .CommonAnnotations.description }}"
+        {% endraw %}

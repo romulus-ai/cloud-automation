@@ -1,0 +1,9 @@
+/var/log/rsnapshot.log {
+	rotate 30
+	daily
+	compress
+	delaycompress
+	missingok
+	notifempty
+	copytruncate
+}

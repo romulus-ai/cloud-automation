@@ -1,0 +1,10 @@
+[Interface]
+Address = 192.168.128.10
+PrivateKey = {{ privatekey.stdout }}
+
+[Peer]
+PublicKey = {{ serverpubkey.stdout }}
+PresharedKey = {{ wireguard.psk }}
+Endpoint = {{ wireguard.server_address }}
+AllowedIPs = 192.168.128.0/24,{{ wireguard.allowedips }}
+PersistentKeepalive = 25 # Sendet die eigene IP Adresse an den Server

@@ -1,0 +1,50 @@
+version: "2.4"
+services:
+  cadvisor:
+{% if ansible_architecture == "aarch64" %}
+    image: zcube/cadvisor:latest
+{% else %}
+    image: gcr.io/cadvisor/cadvisor:latest
+{% endif %}
+    command:
+      - '--docker_only=true'
+      - '--storage_duration=15s'
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+    restart: unless-stopped
+{% if offside %}
+    ports:
+      - "8080:8080"
+{% else %}
+    expose:
+      - 8080
+{% endif %}
+
+  nodeexporter:
+    image: prom/node-exporter:latest
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      - /opt/monitoring-docker/nodeexporter/collector-textfiles:/collector-textfiles
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.textfile.directory=/collector-textfiles/'
+    restart: unless-stopped
+{% if offside %}
+    ports:
+      - "9100:9100"
+    depends_on:
+      cadvisor:
+        condition: service_healthy
+{% else %}
+    expose:
+      - 9100
+{% endif%}

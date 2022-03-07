@@ -1,0 +1,90 @@
+- name: configure rsnapshot
+  template:
+    src: "rsnapshot.conf.j2"
+    dest: "/etc/rsnapshot.conf"
+
+- name: install maintmode control script
+  copy:
+    src: "nc-maintmode.sh"
+    dest: "/usr/local/bin/nc-maintmode.sh"
+    mode: '0754'
+    owner: "root"
+    group: "root"
+
+- name: configure logrotate for rsnapshot
+  copy:
+    src: "rsnapshot-logrotate"
+    dest: "/etc/logrotate.d/rsnapshot"
+    mode: '0644'
+    owner: "root"
+    group: "root"
+
+- name: Creates daily rsnapshot
+  cron:
+    name: rsnapshot daily
+    special_time: "daily"
+    user: root
+    job: "/usr/bin/rsnapshot sync | /usr/local/bin/rsnap_prom_stats ; /usr/bin/rsnapshot daily"
+    cron_file: "/etc/crontab"
+    disabled: "{{ testenv | default(no) }}"
+
+- name: Creates weekly rsnapshot
+  cron:
+    name: rsnapshot weekly
+    minute: "0"
+    hour: "3"
+    weekday: "0"
+    user: root
+    job: "/usr/bin/rsnapshot weekly"
+    cron_file: "/etc/crontab"
+    disabled: "{{ testenv | default(no) }}"
+
+- name: Creates monthly rsnapshot
+  cron:
+    name: rsnapshot monthly
+    minute: "0"
+    hour: "6"
+    day: "1"
+    user: root
+    job: "/usr/bin/rsnapshot monthly"
+    cron_file: "/etc/crontab"
+    disabled: "{{ testenv | default(no) }}"
+
+## Configure viewing basics of backups
+- name: check nextcloud is running
+  community.general.docker_container_info:
+    name: cloud_nextcloud_1
+  register: nextcloud_info
+
+- name: get nextcloud users
+  shell:
+    cmd: /usr/bin/docker exec --user www-data cloud_nextcloud_1 php occ user:list | awk '{print $2}' |cut -d":" -f1
+  when: nextcloud_info.exists
+  register: nextcloud_userlist
+  changed_when: false
+
+- name: get backupdirs
+  shell:
+    cmd: ls  /media/backup/rsnapshot/
+  register: backupdirs
+  changed_when: false
+
+- name: create backupviews dir
+  file:
+    path: "/mnt/backup-views/"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0750'
+
+- name: create backup-view user dirs
+  file:
+    path: "/mnt/backup-views/{{ item[0] }}/{{ item[1] }}"
+    state: directory
+    recurse: yes
+    owner: www-data
+    group: www-data
+    mode: '0750'
+  with_nested:
+    - "{{ nextcloud_userlist.stdout.split('\n') }}"
+    - "{{ backupdirs.stdout.split('\n') }}"

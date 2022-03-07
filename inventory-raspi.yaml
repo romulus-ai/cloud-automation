@@ -1,0 +1,29 @@
+---
+all:
+  hosts:
+    wireguard_server:
+      ansible_host: cloud.tbruckmann.de
+    raspi:
+      ansible_host: 192.168.178.93
+      testenv: no
+      offside: True
+      mosquitto:
+        credentials: "mosquser:$6$YEx2BAOl3h9ZB9AI$ed4XPDkmjj4vsEG9dbfP8ZQgXRhcVjjiH5TD/JAMvZaawwl6/jCrcXqtxwkDNoEHtkwRB9U6kqvA8Hl0bWcWhw=="
+      wireguard:
+        client_name: client1
+        server_address: cloud.tbruckmann.de:51820
+        allowedips: "192.168.2.0/24"
+        psk: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          39353632373864623463333032613466646534663234343936303831626166363065636333333965
+          6432653639323633313335653061646563303336323635610a353735336536346537393238373363
+          66333036373566623965326132636164353861383233396137613637393066613934393465613262
+          6566343430633739310a353232383830613730636232646539376535333333316332343232633964
+          63343763613961613831306362646433636665613838633866383966653236656237653033363266
+          3137353134336535623961626633656361366537353830613538
+      prometheus:
+        fritzbox_address: "192.168.178.1"
+      roomba:
+        address: "192.168.178.21"
+        password: "Woo0grSpbjlQXLuH"
+        blid: "6977C20090115740"

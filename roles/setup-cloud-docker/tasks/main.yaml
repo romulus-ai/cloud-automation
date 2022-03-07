@@ -1,0 +1,93 @@
+- name: create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: 0755
+  with_items:
+    - { "path": "/opt/cloud-docker", "owner": "root", "group": "root" }
+    - { "path": "/opt/cloud-docker/nginx", "owner": "root", "group": "root" }
+    - { "path": "/opt/cloud-docker/nginx/certs", "owner": 101, "group": 101 }
+    - { "path": "/opt/cloud-docker/nginx/vhost.d", "owner": 101, "group": 101 }
+    - { "path": "/opt/cloud-docker/nginx/data", "owner": 101, "group": 101 }
+    - { "path": "/opt/cloud-docker/nginx/htpasswd", "owner": 101, "group": 101 }
+    - { "path": "/opt/cloud-docker/mysql/data", "owner": 1001, "group": 1001 }
+    - { "path": "/opt/cloud-docker/mysql/files", "owner": 1001, "group": 1001 }
+    - { "path": "/opt/cloud-docker/ssllabs-scan", "owner": "root", "group": "root" }
+    - { "path": "/media/data/nextcloud", "owner": "root", "group": "root" }
+    - { "path": "/media/data/nextcloud/install", "owner": 33, "group": 33 }
+    - { "path": "/root/docker-compose", "owner": "root", "group": "root" }
+    - { "path": "/root/docker-compose/cloud", "owner": "root", "group": "root" }
+
+- name: create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: 0770
+  with_items:
+    - { "path": "/media/data/nextcloud/data", "owner": 33, "group": 33 }
+
+
+- name: store cloud docker-compose file and configs
+  template:
+    src: "{{ item.name }}.j2"
+    dest: "/root/docker-compose/cloud/{{ item.name }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+  with_items:
+    - {"name": "docker-compose.yaml", "owner": "root", "group": "root" }
+    - {"name": "my.cnf", "owner": 1001, "group": 1001 }
+    - {"name": "redis.conf", "owner": "root", "group": "root" }
+    - {"name": "stub-status-vhost.conf", "owner": "root", "group": "root" }
+    - {"name": "nc-php.ini", "owner": "root", "group": "root" }
+    - {"name": "nginx-custom-proxy-settings.conf", "owner": "root", "group": "root" }
+
+- name: store basic auth info
+  community.general.htpasswd:
+    path: "/opt/cloud-docker/nginx/htpasswd/{{ item }}"
+    name: prometheus
+    password: "{{ prometheus.password }}"
+    mode: 0640
+    owner: "101"
+    group: "101"
+  with_items:
+    - prometheus.tbruckmann.de
+    - alertmanager.tbruckmann.de
+
+- name: deploy cloud docker environment
+  community.general.docker_compose:
+    project_src: /root/docker-compose/cloud
+    pull: yes
+  register: output
+  ignore_errors: "{{ ansible_check_mode }}"
+
+#- name: debug output
+#  ansible.builtin.debug:
+#    var: output
+
+- name: ensure cloud docker environment runs
+  ansible.builtin.assert:
+    that:
+      # wenn das nicht geht, mal mit arra schreibweise testen
+      - output["services"]["db"]["cloud_db_1"]["state"]["running"]
+      - output["services"]["redis"]["cloud_redis_1"]["state"]["running"]
+      - output["services"]["nginx-proxy"]["cloud_nginx-proxy_1"]["state"]["running"]
+      - output["services"]["letsencrypt"]["cloud_letsencrypt_1"]["state"]["running"]
+      - output["services"]["nextcloud"]["cloud_nextcloud_1"]["state"]["running"]
+      - output["services"]["nextcloud-news-updater"]["cloud_nextcloud-news-updater_1"]["state"]["running"]
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Update all Nextcloud Apps
+  cron:
+    name: update all Nextcloud Apps
+    special_time: "daily"
+    user: root
+    job: "/usr/bin/docker exec --user www-data cloud_nextcloud_1 php occ app:update --all"
+    cron_file: "/etc/crontab"
+    disabled: "{{ testenv | default(no) }}"
+
+- name: install and configure cloud monitoring
+  include_tasks: monitoring.yaml

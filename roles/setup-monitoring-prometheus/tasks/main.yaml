@@ -1,0 +1,113 @@
+- name: create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: 0755
+  with_items:
+    - { "path": "/opt/monitoring-docker", "owner": "root", "group": "root" }
+    - { "path": "/opt/monitoring-docker/prometheus", "owner": "root", "group": "root" }
+    - { "path": "/opt/monitoring-docker/prometheus/data", "owner": 65534, "group": 65534 }
+    - { "path": "/opt/monitoring-docker/prometheus/config", "owner": 65534, "group": 65534 }
+    - { "path": "/opt/monitoring-docker/alertmanager/data", "owner": 65534, "group": 65534 }
+    - { "path": "/opt/monitoring-docker/alertmanager/config", "owner": 65534, "group": 65534 }
+    - { "path": "/opt/monitoring-docker/grafana/data", "owner": 472, "group": "root" }
+    - { "path": "/opt/monitoring-docker/grafana/config/", "owner": "root", "group": "root" }
+    - { "path": "/opt/monitoring-docker/grafana/provisioning", "owner": 472, "group": "root" }
+    - { "path": "/opt/monitoring-docker/grafana/provisioning/dashboards", "owner": 472, "group": "root" }
+    - { "path": "/opt/monitoring-docker/grafana/provisioning/dashboards-ssr", "owner": 472, "group": "root" }
+    - { "path": "/opt/monitoring-docker/grafana/provisioning/datasources", "owner": 472, "group": "root" }
+    - { "path": "/opt/monitoring-docker/grafana/provisioning/plugins", "owner": 472, "group": "root" }
+    - { "path": "/opt/monitoring-docker/grafana/provisioning/notifiers", "owner": 472, "group": "root" }
+    - { "path": "/opt/monitoring-docker/nodeexporter/collector-textfiles", "owner": "root", "group": "root" }
+    - { "path": "/root/docker-compose", "owner": "root", "group": "root" }
+    - { "path": "/root/docker-compose/monitoring-prometheus", "owner": "root", "group": "root" }
+
+- name: configure prometheus
+  copy:
+    src: "{{ item }}"
+    dest: "/opt/monitoring-docker/prometheus/config/{{ item | basename }}"
+    owner: "65534"
+    group: "65534"
+  with_fileglob:
+    - prometheus/*
+  notify:
+    - reload promconfig
+
+- name: store prometheus and alertmanager configs
+  template:
+    src: "{{ item.name }}.j2"
+    dest: "/opt/monitoring-docker/{{ item.service }}/config/{{ item.name }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+  with_items:
+    - {"name": "prometheus.yaml", "service": "prometheus", "owner": 65534, "group": 65534 }
+    - {"name": "alertmanager.yaml", "service": "alertmanager", "owner": 65534, "group": 65534 }
+    - {"name": "grafana.ini", "service": "grafana", "owner": "root", "group": "root" }
+  notify:
+    - reload promconfig
+    - reload amconfig
+
+- name: configure grafana dashboards
+  copy:
+    src: "{{ item }}"
+    dest: "/opt/monitoring-docker/grafana/provisioning/dashboards/{{ item | basename }}"
+    owner: "472"
+    group: "root"
+  with_fileglob:
+    - grafana-provisioning/dashboards/*
+
+- name: configure grafana SSR dashboards
+  copy:
+    src: "grafana-provisioning/dashboards/{{ item }}"
+    dest: "/opt/monitoring-docker/grafana/provisioning/dashboards-ssr/{{ item }}"
+    owner: "472"
+    group: "root"
+  with_items:
+    - ssrtraining.json
+
+- name: configure grafana datasources
+  template:
+    src: "grafana-provisioning/datasources/prometheus.yaml.j2"
+    dest: "/opt/monitoring-docker/grafana/provisioning/datasources/prometheus.yaml"
+    owner: "472"
+    group: "root"
+
+- name: store monitoring docker-compose file
+  template:
+    src: "docker-compose.yaml.j2"
+    dest: "/root/docker-compose/monitoring-prometheus/docker-compose.yaml"
+    owner: "root"
+    group: "root"
+
+- name: deploy monitoring docker environment
+  community.general.docker_compose:
+    project_src: /root/docker-compose/monitoring-prometheus
+    project_name: cloud
+    pull: yes
+  register: output
+  ignore_errors: "{{ ansible_check_mode }}"
+  notify:
+    - reload promconfig
+    - reload amconfig
+
+#- name: debug output
+#  ansible.builtin.debug:
+#    var: output
+
+- name: ensure monitoring docker environment runs
+  ansible.builtin.assert:
+    that:
+      - output["services"]["prometheus"]["cloud_prometheus_1"]["state"]["running"]
+      - output["services"]["alertmanager"]["cloud_alertmanager_1"]["state"]["running"]
+      - output["services"]["grafana"]["cloud_grafana_1"]["state"]["running"]
+      - output["services"]["pushgateway"]["cloud_pushgateway_1"]["state"]["running"]
+      - output["services"]["ssllabsexporter"]["cloud_ssllabsexporter_1"]["state"]["running"]
+      - output["services"]["blackboxexporter"]["cloud_blackboxexporter_1"]["state"]["running"]
+  ignore_errors: "{{ ansible_check_mode }}"
+
+#- name: configure Grafana adminuser Password
+#  shell:
+#    cmd: "docker exec -it monitoring_grafana_1 grafana-cli admin reset-admin-password {{ prometheus.password }} && echo 'adminpw set $(date)' > /opt/monitoring-docker/grafana/adminpw-set.persist"
+#    creates: "/opt/monitoring-docker/grafana/adminpw-set.persist"

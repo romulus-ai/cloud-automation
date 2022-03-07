@@ -1,0 +1,179 @@
+global:
+  scrape_interval:     10s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 10s # Evaluate rules every 15 seconds. The default is every 1 minute.
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - scheme: http
+      basic_auth:
+        username: prometheus
+        password: {{ prometheus.password }}
+      static_configs:
+        - targets: [alertmanager:9093]
+
+rule_files:
+  - "alert-rules.yaml"
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: [localhost:9090]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: [pushgateway:9091]
+
+  - job_name: 'nodeexporter'
+    scrape_interval: 5s
+    static_configs:
+      - targets: [nodeexporter:9100]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: 'cadvisor'
+    scrape_interval: 5s
+    static_configs:
+      - targets: [cadvisor:8080]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: 'mysqlexporter'
+    static_configs:
+      - targets: [mysqlexporter:9104]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: 'redisexporter'
+    static_configs:
+      - targets: [redisexporter:9121]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: 'ssllabsexporter'
+    scrape_interval: 10m
+    scrape_timeout: 10m
+    metrics_path: /probe
+    static_configs:
+    - targets:
+      - cloud.tbruckmann.de
+      - owncloud.tbruckmann.de
+      - monitor.tbruckmann.de
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: ssllabsexporter:19115  # change this to the FQDN of ssllabs-exporter
+      - source_labels: [__param_target]
+        target_label: instance
+
+  - job_name: 'blackboxexporter'
+    scrape_interval: 10m
+    metrics_path: /probe
+    params:
+      module: [http_2xx]  # Look for a HTTP 200 response.
+    static_configs:
+      - targets:
+        - cloud.tbruckmann.de
+        - owncloud.tbruckmann.de
+        - monitor.tbruckmann.de
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackboxexporter:9115
+
+  - job_name: 'fritzboxexporter'
+    static_configs:
+      - targets: [fritzboxexporter:9133]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: 'nextcloudexporter'
+    static_configs:
+      - targets: [nextcloudexporter:9205]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: 'nginxexporter'
+    static_configs:
+      - targets: [nginxexporter:9113]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: "speedtestexporter"
+    scrape_interval: 5m
+    scrape_timeout: 1m
+    metrics_path: /metrics
+    static_configs:
+      - targets: [speedtestexporter:9102]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: "dockerhubexporter"
+    scrape_interval: 1m
+    scrape_timeout: 1m
+    metrics_path: /metrics
+    static_configs:
+      - targets: [dockerhubexporter:9170]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: "mqttexporter"
+    scrape_interval: 5m
+    scrape_timeout: 1m
+    metrics_path: /metrics
+    static_configs:
+      - targets: [mqttexporter:9641]
+        labels:
+          instance: 'cloud.tbruckmann.de'
+
+  - job_name: "nodeexporter-sb"
+    scrape_interval: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets: [{{ prometheus.node_sb }}:9100]
+        labels:
+          instance: 'sb.tbruckmann.de'
+
+  - job_name: 'cadvisor-sb'
+    scrape_interval: 10s
+    static_configs:
+      - targets: [{{ prometheus.node_sb }}:8080]
+        labels:
+          instance: 'sb.tbruckmann.de'
+
+  - job_name: "mqttexporter-sb"
+    scrape_interval: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets: [{{ prometheus.node_sb }}:9641]
+        labels:
+          instance: 'sb.tbruckmann.de'
+
+  - job_name: "fritzboxexporter-sb"
+    static_configs:
+      - targets: [{{ prometheus.node_sb }}:9133]
+        labels:
+          instance: 'sb.tbruckmann.de'
+
+  - job_name: "speedtestexporter-sb"
+    scrape_interval: 5m
+    scrape_timeout: 1m
+    metrics_path: /metrics
+    static_configs:
+      - targets: [{{ prometheus.node_sb }}:9102]
+        labels:
+          instance: 'sb.tbruckmann.de'
+
+  - job_name: "roombaexporter-sb"
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    metrics_path: /metrics
+    static_configs:
+      - targets: [{{ prometheus.node_sb }}:9117]
+        labels:
+          instance: 'sb.tbruckmann.de'

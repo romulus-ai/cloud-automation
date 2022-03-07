@@ -1,0 +1,59 @@
+
+- name: install wireguard
+  apt:
+    name:
+      - wireguard
+      - libmonitoring-plugin-perl
+    state: present
+
+- name: Add the wireguard kernel module
+  community.general.modprobe:
+    name: wireguard
+    state: present
+
+- name: Add wireguard kernel module to autoload file
+  lineinfile:
+    create: yes
+    dest: "/etc/modules"
+    line: "wireguard"
+    state: present
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Enable IPv4 Forward
+  sysctl:
+    name: 'net.ipv4.ip_forward'
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+
+- name: place wireguard checks
+  copy:
+    src: "{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: '0700'
+    owner: root
+    group: root
+  with_items:
+    - check_wireguard
+    - wireguard-metrics.sh
+
+- name: Restart wireguard tunnel if its down
+  cron:
+    name: wireguard tunnel watcher
+    minute: "*/5"
+    user: root
+    job: "/usr/local/bin/check_wireguard 2>&1 >/dev/null|| systemctl restart wg-quick@wg0.service"
+    cron_file: "/etc/crontab"
+    disabled: "{{ testenv | default(no) }}"
+
+- name: add metrics check to node exporter external scripts collector
+  cron:
+    name: wireguard metrics
+    minute: "*/1"
+    user: root
+    job: "/usr/local/bin/wireguard-metrics.sh | sponge /opt/monitoring-docker/nodeexporter/collector-textfiles/wireguard-metrics.prom"
+    cron_file: "/etc/crontab"
+    disabled: "{{ testenv | default(no) }}"

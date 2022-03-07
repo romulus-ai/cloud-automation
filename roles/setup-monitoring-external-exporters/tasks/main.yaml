@@ -1,0 +1,41 @@
+- name: create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: 0755
+  with_items:
+    - { "path": "/root/docker-compose/monitoring-external", "owner": "root", "group": "root" }
+    - { "path": "/opt/electromonitor-docker", "owner": "root", "group": "root" }
+    - { "path": "/opt/electromonitor-docker/mosquitto/", "owner": "root", "group": "root" }
+    - { "path": "/opt/electromonitor-docker/mosquitto/data/", "owner": 1883, "group": 1883 }
+
+- name: store monitoring-external configuration files
+  template:
+    src: "{{ item }}.j2"
+    dest: "/root/docker-compose/monitoring-external/{{ item }}"
+    owner: "root"
+    group: "root"
+  with_items:
+    - docker-compose.yaml
+    - mqtt-exporter.yaml
+    - mosquitto-passwords
+    - mosquitto.conf
+
+- name: deploy external monitoring
+  community.general.docker_compose:
+    project_src: /root/docker-compose/monitoring-external
+    project_name: cloud
+    pull: yes
+  register: output
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: ensure external monitoring runs
+  ansible.builtin.assert:
+    that:
+      - output["services"]["fritzboxexporter"]["cloud_fritzboxexporter_1"]["state"]["running"]
+      - output["services"]["speedtestexporter"]["cloud_speedtestexporter_1"]["state"]["running"]
+      - output["services"]["mqtt"]["cloud_mqtt_1"]["state"]["running"]
+      - output["services"]["mqttexporter"]["cloud_mqttexporter_1"]["state"]["running"]
+  ignore_errors: "{{ ansible_check_mode }}"

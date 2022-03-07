@@ -1,0 +1,14 @@
+
+- name: restart timesyncd
+  service:
+    name: systemd-timesyncd
+    state: restarted
+    enabled: yes
+    masked: no
+    daemon_reload: yes
+
+- name: apply kernel tweaks
+  command: /usr/sbin/update-grub
+
+- name: reboot system
+  reboot:

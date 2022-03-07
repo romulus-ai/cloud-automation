@@ -1,0 +1,38 @@
+- name: apply mysql logininfos
+  template:
+    src: .my.cnf.j2
+    dest: /root/.my.cnf
+
+- name: copydata definition sql file
+  copy:
+    src: create-data-definition.sql
+    dest: /tmp/create-data-definition.sql
+
+- name: create sstraining DB and Table if not exists
+  shell:
+    cmd: |
+      /usr/bin/mysql -h 127.0.0.1 < /tmp/create-data-definition.sql
+
+- name: copy trainings CSV file to server
+  copy:
+    src: "{{ trainingcsv }}"
+    dest: "/opt/cloud-docker/mysql/files/{{ trainingcsv | basename }}"
+    owner: "1001"
+    group: "1001"
+    mode: '0644'
+
+- name: import newest training results
+  shell:
+    cmd: |
+      /usr/bin/mysql -h 127.0.0.1 ssrtraining -e "LOAD DATA INFILE '/var/lib/mysql-files/{{ trainingcsv | basename }}' REPLACE INTO TABLE data FIELDS TERMINATED BY ';';"
+
+- name: get result
+  shell:
+    cmd: |
+      /usr/bin/mysql -h 127.0.0.1 ssrtraining -e "select * from data;"
+  register: importresult
+
+#- name: print result
+#  debug:
+#    msg: "{{ importresult.stdout }}"
+#  when: importresult is defined and importresult.changed

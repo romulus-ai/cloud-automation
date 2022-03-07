@@ -1,0 +1,61 @@
+- name: generate wireguard privatekeys
+  shell:
+    cmd: "wg genkey > /etc/wireguard/{{ item.name }}.private.key"
+    creates: "/etc/wireguard/{{ item.name }}.private.key"
+  with_items: "{{ wireguard.peers }}"
+
+- name: read wireguard privatekeys
+  shell:
+    cmd: "cat /etc/wireguard/{{ item.name }}.private.key"
+  with_items: "{{ wireguard.peers }}"
+  register: wireguard_privatekeys
+  changed_when: false
+
+- name: generate wireguard publickeys
+  shell:
+    cmd: "cat /etc/wireguard/{{ item.name }}.private.key | wg pubkey > /etc/wireguard/{{ item.name }}.public.key"
+    creates: "/etc/wireguard/{{ item.name }}.public.key"
+  with_items: "{{ wireguard.peers }}"
+
+- name: read wireguard publickeys
+  shell:
+    cmd: "cat /etc/wireguard/{{ item.name }}.public.key"
+  with_items: "{{ wireguard.peers }}"
+  register: wireguard_publickeys
+  changed_when: false
+
+- name: adjust private key permissions
+  file:
+    path: "/etc/wireguard/{{ item.name }}.private.key"
+    mode: '0600'
+    owner: root
+    group: root
+  with_items: "{{ wireguard.peers }}"
+
+- name: adjust public key permissions
+  file:
+    path: "/etc/wireguard/{{ item.name }}.public.key"
+    mode: '0600'
+    owner: root
+    group: root
+  with_items: "{{ wireguard.peers }}"
+
+- name: configure wireguard
+  template:
+    src: wg0-server.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: '0600'
+  vars:
+    privatekeys: "{{ wireguard_privatekeys }}"
+    publickeys: "{{ wireguard_publickeys }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: start wireguard
+  service:
+    name: "wg-quick@wg0.service"
+    state: started
+    enabled: yes
+    masked: no
+    daemon_reload: yes
+  ignore_errors: "{{ ansible_check_mode }}"
+

@@ -1,0 +1,34 @@
+- name: create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: 0755
+  with_items:
+    - { "path": "/root/docker-compose", "owner": "root", "group": "root" }
+    - { "path": "/root/docker-compose/monitoring-cloud", "owner": "root", "group": "root" }
+
+- name: store cloud monitoring docker-compose file
+  template:
+    src: "docker-compose-monitoring.yaml.j2"
+    dest: "/root/docker-compose/monitoring-cloud/docker-compose.yaml"
+    owner: "root"
+    group: "root"
+
+- name: deploy cloud monitoring
+  community.general.docker_compose:
+    project_src: /root/docker-compose/monitoring-cloud
+    project_name: cloud
+    pull: yes
+  register: output
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: ensure cloud monitoring runs
+  ansible.builtin.assert:
+    that:
+      - output["services"]["mysqlexporter"]["cloud_mysqlexporter_1"]["state"]["running"]
+      - output["services"]["redisexporter"]["cloud_redisexporter_1"]["state"]["running"]
+      - output["services"]["nginxexporter"]["cloud_nginxexporter_1"]["state"]["running"]
+      - output["services"]["nextcloudexporter"]["cloud_nextcloudexporter_1"]["state"]["running"]
+  ignore_errors: "{{ ansible_check_mode }}"

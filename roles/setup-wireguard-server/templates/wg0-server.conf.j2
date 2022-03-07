@@ -1,0 +1,21 @@
+[Interface]
+Address = 192.168.128.1/24
+ListenPort = 51820
+{% for key in privatekeys.results %}
+{% if key.item.name == 'server' %}
+PrivateKey = {{ key.stdout }}
+{% endif %}
+{% endfor %}
+SaveConfig = true
+#PostUp = iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+#PostDown = iptables -w -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+
+{% for key in publickeys.results %}
+{% if key.item.name != 'server' %}
+[Peer]
+# {{ key.item.name }}
+PublicKey = {{ key.stdout }}
+PresharedKey = {{ wireguard.psk }}
+AllowedIPs = 192.168.128.0/24,{{ key.item.allowedips }}
+{% endif %}
+{% endfor %}

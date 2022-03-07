@@ -1,0 +1,36 @@
+version: "2.4"
+services:
+
+  mysqlexporter:
+    image: prom/mysqld-exporter:latest
+    environment:
+      - DATA_SOURCE_NAME=root:{{ mysql.root_password }}@(db:3306)/
+    restart: unless-stopped
+    expose:
+      - 9104
+
+  redisexporter:
+    image: oliver006/redis_exporter:latest
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    restart: unless-stopped
+    expose:
+      - 9121
+
+  nextcloudexporter:
+    image: xperimental/nextcloud-exporter:latest
+    environment:
+      - NEXTCLOUD_SERVER=https://cloud.tbruckmann.de
+      - NEXTCLOUD_USERNAME=monitoring
+      - NEXTCLOUD_PASSWORD={{ cloud.monitoring_password }}
+      - NEXTCLOUD_TIMEOUT=60s
+    restart: unless-stopped
+    expose:
+      - 9205
+
+  nginxexporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    command: -nginx.scrape-uri http://nginx-proxy:8080/basic_status
+    restart: unless-stopped
+    expose:
+      - 9113

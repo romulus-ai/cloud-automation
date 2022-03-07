@@ -1,0 +1,7 @@
+- name: Restore Nextcloud
+  hosts: all
+  remote_user: root
+  # interrupt fully if anything fails
+  any_errors_fatal: true
+  roles:
+    - restore-nextcloud-backup
